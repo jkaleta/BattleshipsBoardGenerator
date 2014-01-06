@@ -22,11 +22,11 @@ namespace BattleshipGameboardGenerator
 
             var sb = new StringBuilder();
 
-            for (var i = 0; i < 10; i++)
+            for (var row = 0; row < 10; row++)
             {
-                for (var j = 0; j < 10; j++)
+                for (var column = 0; column < 10; column++)
                 {
-                    sb.Append(boardRepresentation[i, j] == shipRepresentation
+                    sb.Append(boardRepresentation[row, column] == shipRepresentation
                                   ? shipRepresentation
                                   : emptyFieldRepresentation);
                 }

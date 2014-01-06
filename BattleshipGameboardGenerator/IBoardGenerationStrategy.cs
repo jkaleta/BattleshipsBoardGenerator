@@ -43,7 +43,7 @@ namespace BattleshipGameboardGenerator
 
                 for (var i = 0; i < shipLength; i++)
                 {
-                    var coordinate = new BoardCoordinate((short)row, (short)(column + i));
+                    var coordinate = new BoardCoordinate(row, (column + i));
                     board.BoardRepresentation.Add(coordinate);
                     Console.Out.WriteLine("Placing mast at {0}", coordinate.ToString());
                 }
@@ -56,7 +56,7 @@ namespace BattleshipGameboardGenerator
 
                 for (var i = 0; i < shipLength; i++)
                 {
-                    var coordinate = new BoardCoordinate((short)(row + 1), (short)column);
+                    var coordinate = new BoardCoordinate((row + 1), column);
                     board.BoardRepresentation.Add(coordinate);
                     Console.Out.WriteLine("Placing mast at {0}", coordinate.ToString());
                 }

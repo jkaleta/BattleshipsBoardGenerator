@@ -5,9 +5,9 @@ namespace BattleshipGameboardGenerator
 {
     public class BruteForceBoardGenerationStrategy : IBoardGenerationStrategy
     {
-        private ShipConfiguration _shipConfiguration;
+        private readonly ShipConfiguration _shipConfiguration;
         private readonly BoardCoordinate _startingCoordinate;
-        private IDictionary<int, ShipPositioningParameters> _shipPositioningParametersPerShipLevel;
+        private readonly IDictionary<int, ShipPositioningParameters> _shipPositioningParametersPerShipLevel;
         private readonly CellStatus[,] _workingSet = new CellStatus[10, 10];
 
         public BruteForceBoardGenerationStrategy(ShipConfiguration shipConfiguration, BoardCoordinate startingCoordinate)
@@ -39,7 +39,8 @@ namespace BattleshipGameboardGenerator
 
             var lengthOfNextShipToPosition = _shipConfiguration.ShipLengths[shipsPositionedSoFar];
             var directionOfPositioning = ShipDirection.Horizontal; // TODO
-            var position = FindNextFreePosition(_startingCoordinate); // TODO - the starting coordinate must be extracted from per level stuff
+            var position = FindNextFreeSpace(_startingCoordinate, directionOfPositioning, lengthOfNextShipToPosition);
+            // TODO - the starting coordinate must be extracted from per level stuff
 
             // actual positioning of the ship
             PlaceShipOnMap(lengthOfNextShipToPosition, directionOfPositioning, position);
@@ -51,27 +52,27 @@ namespace BattleshipGameboardGenerator
 
         private void PlaceShipOnMap(int lengthOfNextShipToPosition, ShipDirection directionOfPositioning, BoardCoordinate position)
         {
-            Console.Out.WriteLine("Placing ship on map: {0} masts", lengthOfNextShipToPosition);
+            Console.Out.WriteLine("Placing ship on map: {0} masts, position: {1}", lengthOfNextShipToPosition, position);
 
             // first mark everything on and around cells where the ship will be as unavailable
-            var startingCoordinateX = Math.Max(position.Row - 1, 0);
-            var startingCoordinateY = Math.Max(position.Column - 1, 0);
+            var startingCoordinateX = Math.Max(position.Column - 1, 0);
+            var startingCoordinateY = Math.Max(position.Row - 1, 0);
             var endCoordinateX = directionOfPositioning == ShipDirection.Horizontal ?
-                Math.Min(position.Column + lengthOfNextShipToPosition, 9) :
+                Math.Min(position.Column + lengthOfNextShipToPosition + 1, 9) :
                 Math.Min(position.Column + 1, 9);
-            var endCoordinateY = directionOfPositioning == ShipDirection.Horizontal ?
-                Math.Min(position.Row + lengthOfNextShipToPosition, 9) :
+            var endCoordinateY = directionOfPositioning == ShipDirection.Vertical ?
+                Math.Min(position.Row + lengthOfNextShipToPosition + 1, 9) :
                 Math.Min(position.Row + 1, 9);
 
-            for (var i = startingCoordinateX; i < endCoordinateX; i++)
-                for (var j = startingCoordinateY; j < endCoordinateY; j++)
-                    _workingSet[i, j] = CellStatus.NotAvailableForPlacement;
+            for (var row = startingCoordinateY; row <= endCoordinateY; row++)
+                for (var column = startingCoordinateX; column <= endCoordinateX; column++)
+                    _workingSet[row, column] = CellStatus.NotAvailableForPlacement;
 
             // next mark where the ship actually is
             for (int i = 0; i < lengthOfNextShipToPosition; i++)
             {
-                var row = directionOfPositioning == ShipDirection.Horizontal ? Math.Min(position.Row + i, 9) : position.Row;
-                var column = directionOfPositioning == ShipDirection.Horizontal ? position.Column : Math.Min(position.Column + i, 9);
+                var row = directionOfPositioning == ShipDirection.Horizontal ? position.Row : Math.Min(position.Column + i, 9);
+                var column = directionOfPositioning == ShipDirection.Vertical ? position.Column : Math.Min(position.Column + i, 9);
 
                 _workingSet[row, column] = CellStatus.ShipPart;
             }
@@ -86,16 +87,58 @@ namespace BattleshipGameboardGenerator
             _shipPositioningParametersPerShipLevel.Add(shipsPositionedSoFar, currentlyPositionedShipPositioningParameters);
         }
 
-        private BoardCoordinate FindNextFreePosition(BoardCoordinate cellToStartSearch)
+        private BoardCoordinate FindNextFreeSpace(BoardCoordinate cellToStartSearch, ShipDirection direction, int shipLength)
         {
-            for (short i = cellToStartSearch.Row; i < 10; i++)
+            // the free space must be a cluster of cells with 'Free' status, such that
+            // they can be contiguous and none of the cells of the new ship lands on 
+            // a 'not available for placement' or 'ship part' field. 
+
+            // TODO - overflow to start search from 0 when cannot find place in the last column
+
+            for (var row = cellToStartSearch.Row; row < 10; row++)
             {
-                for (short j = cellToStartSearch.Column; j < 10; j++)
+                for (var column = cellToStartSearch.Column; column < 10; column++)
                 {
-                    if (_workingSet[i, j] == CellStatus.Free)
+                    if (_workingSet[row, column] == CellStatus.Free)
                     {
-                        // TODO -add way more logic here 
-                        return new BoardCoordinate(i, j);
+                        if (direction == ShipDirection.Horizontal)
+                        {
+                            // first - check if there is enough room to place the ship in the current row/column
+                            if (column + shipLength > 9)
+                                continue;
+
+                            // next, check if the entire span of the next few cells is available
+                            var spanAvailable = true;
+                            for (var c = column; c < column + shipLength; c++)
+                            {
+                                if (_workingSet[row, c] != CellStatus.Free)
+                                {
+                                    spanAvailable = false;
+                                    break;
+                                }
+                            }
+                            if (!spanAvailable)
+                                continue;
+                        }
+                        else
+                        {
+                            if (row + shipLength > 9)
+                                continue;
+
+                            var spanAvailable = true;
+                            for (var r = row; r < row + shipLength; r++)
+                            {
+                                if (_workingSet[r, column] != CellStatus.Free)
+                                {
+                                    spanAvailable = false;
+                                    break;
+                                }
+                            }
+                            if (!spanAvailable)
+                                continue;
+                        }
+
+                        return new BoardCoordinate(row, column);
                     }
                 }
             }
@@ -107,10 +150,10 @@ namespace BattleshipGameboardGenerator
         {
             var generated = new Board(_shipConfiguration);
 
-            _workingSet.Foreach((i, j) =>
+            _workingSet.Foreach((row, column) =>
                 {
-                    if (_workingSet[i, j] == CellStatus.ShipPart)
-                        generated.BoardRepresentation.Add(new BoardCoordinate((short)i, (short)j));
+                    if (_workingSet[row, column] == CellStatus.ShipPart)
+                        generated.BoardRepresentation.Add(new BoardCoordinate(row, column));
                 });
 
             if (!generated.IsValid)
@@ -123,7 +166,7 @@ namespace BattleshipGameboardGenerator
 
         private void ReInitializeWorkingSet()
         {
-            _workingSet.Foreach((i, j) => _workingSet[i, j] = CellStatus.Free);
+            _workingSet.Foreach((row, c) => _workingSet[row, c] = CellStatus.Free);
         }
     }
 
