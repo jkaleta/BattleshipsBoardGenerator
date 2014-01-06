@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace BattleshipGameboardGenerator
 {
@@ -6,12 +7,17 @@ namespace BattleshipGameboardGenerator
     {
         static void Main(string[] args)
         {
-            var boardGenerator = new BoardGenerator();
-            var board = boardGenerator.GenerateBoard(new ShipConfiguration(new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }));
+            var shipConfiguration = new ShipConfiguration(new[] {4, 3, 3, 2, 2, 2, 1, 1, 1, 1});
+            //var boardGenerator = new RandomBoardGenerationStrategy(shipConfiguration);
+            var boardGenerator = new BruteForceBoardGenerationStrategy(shipConfiguration, BoardCoordinate.Default);
+            var boards = boardGenerator.GenerateBoards().ToList();
             var presenter = new BoardPresenter();
-            var boardPresentation = presenter.PresentBoardGraphically(board, '0', '1');
 
-            Console.Out.Write(boardPresentation);
+            foreach(var b in boards)
+            {
+                var boardPresentation = presenter.PresentBoardGraphically(b, '0', '1');
+                Console.Out.Write(boardPresentation);
+            }
 
             Console.ReadLine();
         }

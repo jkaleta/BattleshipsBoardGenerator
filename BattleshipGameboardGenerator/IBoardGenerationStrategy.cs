@@ -3,16 +3,28 @@ using System.Collections.Generic;
 
 namespace BattleshipGameboardGenerator
 {
-    public class BoardGenerator
+    public interface IBoardGenerationStrategy
     {
-        public Board GenerateBoard(ShipConfiguration shipConfiguration)
-        {
-            var board = new Board(shipConfiguration);
+        IEnumerable<Board> GenerateBoards();
+    }
 
-            foreach (var ship in shipConfiguration.ShipLengths)
+    public class RandomBoardGenerationStrategy : IBoardGenerationStrategy
+    {
+        private readonly ShipConfiguration _shipConfiguration;
+
+        public RandomBoardGenerationStrategy(ShipConfiguration shipConfiguration)
+        {
+            _shipConfiguration = shipConfiguration;
+        }
+
+        public IEnumerable<Board> GenerateBoards()
+        {
+            var board = new Board(_shipConfiguration);
+
+            foreach (var ship in _shipConfiguration.ShipLengths)
                 PlaceShipOnBoard(board, ship);
 
-            return board;
+            yield return board;
         }
 
         private void PlaceShipOnBoard(Board board, int shipLength)
@@ -31,7 +43,7 @@ namespace BattleshipGameboardGenerator
 
                 for (var i = 0; i < shipLength; i++)
                 {
-                    var coordinate = new BoardCoordinate((short) row, (short) (column + i));
+                    var coordinate = new BoardCoordinate((short)row, (short)(column + i));
                     board.BoardRepresentation.Add(coordinate);
                     Console.Out.WriteLine("Placing mast at {0}", coordinate.ToString());
                 }
@@ -44,39 +56,11 @@ namespace BattleshipGameboardGenerator
 
                 for (var i = 0; i < shipLength; i++)
                 {
-                    var coordinate = new BoardCoordinate((short) (row + 1), (short) column);
+                    var coordinate = new BoardCoordinate((short)(row + 1), (short)column);
                     board.BoardRepresentation.Add(coordinate);
                     Console.Out.WriteLine("Placing mast at {0}", coordinate.ToString());
                 }
             }
         }
     }
-
-    public class Board
-    {
-        public Board(ShipConfiguration shipConfiguration)
-        {
-            BoardRepresentation = new HashSet<BoardCoordinate>();
-            ShipConfiguration = shipConfiguration;
-        }
-
-        public HashSet<BoardCoordinate> BoardRepresentation { get; private set; }
-        public ShipConfiguration ShipConfiguration { get; private set; }
-
-        public bool IsValid
-        {
-            get { throw new NotImplementedException(); }
-        }
-    }
-
-    public class ShipConfiguration
-    {
-        public ShipConfiguration(int[] shipLengths)
-        {
-            ShipLengths = shipLengths;
-        }
-
-        public int[] ShipLengths { get; private set; }
-    }
-
 }

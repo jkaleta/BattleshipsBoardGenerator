@@ -17,5 +17,7 @@ namespace BattleshipGameboardGenerator
         {
             return ((char)((65) + Row)) + (Column + 1).ToString(CultureInfo.InvariantCulture);
         }
+
+        public static BoardCoordinate Default = new BoardCoordinate(0, 0);
     }
 }
