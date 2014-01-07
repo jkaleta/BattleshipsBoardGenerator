@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BattleshipGameboardGenerator
 {
@@ -16,11 +17,12 @@ namespace BattleshipGameboardGenerator
 
         public bool IsValid
         {
-            get
-            {
-                // TODO - implement 
-                return true;
-            }
+            get { return BoardRepresentation.Count == ShipConfiguration.ShipLengths.Sum(); }
+        }
+
+        public override string ToString()
+        {
+            return string.Join(",", BoardRepresentation);
         }
     }
 }

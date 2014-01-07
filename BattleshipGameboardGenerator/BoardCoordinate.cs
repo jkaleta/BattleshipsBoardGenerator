@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Collections.Generic;
+using System.Globalization;
 
 namespace BattleshipGameboardGenerator
 {
@@ -16,6 +17,13 @@ namespace BattleshipGameboardGenerator
         public override string ToString()
         {
             return ((char)((65) + Row)) + (Column + 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static IEnumerable<BoardCoordinate> GetAllPossibleCoordinates(int xDim, int yDim)
+        {
+            for (int i = 0; i < xDim; i++)
+                for (int j = 0; j < yDim; j++)
+                    yield return new BoardCoordinate(i, j);
         }
 
         public static BoardCoordinate Default = new BoardCoordinate(0, 0);

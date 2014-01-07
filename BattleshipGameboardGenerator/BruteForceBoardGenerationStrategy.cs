@@ -1,191 +1,116 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BattleshipGameboardGenerator
 {
-    public class BruteForceBoardGenerationStrategy : IBoardGenerationStrategy
+    public class BruteForceBoardGenerationStrategy
     {
         private readonly ShipConfiguration _shipConfiguration;
-        private readonly BoardCoordinate _startingCoordinate;
-        private readonly IDictionary<int, ShipPositioningParameters> _shipPositioningParametersPerShipLevel;
-        private readonly CellStatus[,] _workingSet = new CellStatus[10, 10];
 
-        public BruteForceBoardGenerationStrategy(ShipConfiguration shipConfiguration, BoardCoordinate startingCoordinate)
+        public BruteForceBoardGenerationStrategy(ShipConfiguration shipConfiguration)
         {
             _shipConfiguration = shipConfiguration;
-            _startingCoordinate = startingCoordinate;
-            _shipPositioningParametersPerShipLevel = new Dictionary<int, ShipPositioningParameters>(shipConfiguration.ShipLengths.Length);
         }
 
-        public IEnumerable<Board> GenerateBoards()
+        private readonly Queue<IEnumerable<ShipPositioningParameters>> _mainQueue =
+            new Queue<IEnumerable<ShipPositioningParameters>>();
+
+        private readonly Queue<Board> _boardQueue =
+            new Queue<Board>();
+
+        private void PopulateProcessingQueue()
         {
-
-            ReInitializeWorkingSet();
-            PlaceNextShip();
-            yield return ConvertWorkingSetIntoBoard();
-
-        }
-
-        private void PlaceNextShip()
-        {
-            var shipsPositionedSoFar = _shipPositioningParametersPerShipLevel.Count;
-
-            if (shipsPositionedSoFar == _shipConfiguration.ShipLengths.Length)
-            {
-                // all ships have been positioned. Iterate to next board. 
-                // TODO
-                return;
-            }
-
-            var lengthOfNextShipToPosition = _shipConfiguration.ShipLengths[shipsPositionedSoFar];
-            var directionOfPositioning = ShipDirection.Horizontal; // TODO
-            var position = FindNextFreeSpace(_startingCoordinate, directionOfPositioning, lengthOfNextShipToPosition);
-            // TODO - the starting coordinate must be extracted from per level stuff
-
-            // actual positioning of the ship
-            PlaceShipOnMap(lengthOfNextShipToPosition, directionOfPositioning, position);
-
-            // TODO
-
-            PlaceNextShip();
-        }
-
-        private void PlaceShipOnMap(int lengthOfNextShipToPosition, ShipDirection directionOfPositioning, BoardCoordinate position)
-        {
-            Console.Out.WriteLine("Placing ship on map: {0} masts, position: {1}", lengthOfNextShipToPosition, position);
-
-            // first mark everything on and around cells where the ship will be as unavailable
-            var startingCoordinateX = Math.Max(position.Column - 1, 0);
-            var startingCoordinateY = Math.Max(position.Row - 1, 0);
-            var endCoordinateX = directionOfPositioning == ShipDirection.Horizontal ?
-                Math.Min(position.Column + lengthOfNextShipToPosition + 1, 9) :
-                Math.Min(position.Column + 1, 9);
-            var endCoordinateY = directionOfPositioning == ShipDirection.Vertical ?
-                Math.Min(position.Row + lengthOfNextShipToPosition + 1, 9) :
-                Math.Min(position.Row + 1, 9);
-
-            for (var row = startingCoordinateY; row <= endCoordinateY; row++)
-                for (var column = startingCoordinateX; column <= endCoordinateX; column++)
-                    _workingSet[row, column] = CellStatus.NotAvailableForPlacement;
-
-            // next mark where the ship actually is
-            for (int i = 0; i < lengthOfNextShipToPosition; i++)
-            {
-                var row = directionOfPositioning == ShipDirection.Horizontal ? position.Row : Math.Min(position.Column + i, 9);
-                var column = directionOfPositioning == ShipDirection.Vertical ? position.Column : Math.Min(position.Column + i, 9);
-
-                _workingSet[row, column] = CellStatus.ShipPart;
-            }
-
-            // finally, add the positioned ship to the collection of positioned ships
-            var shipsPositionedSoFar = _shipPositioningParametersPerShipLevel.Count;
-            var currentlyPositionedShipPositioningParameters = new ShipPositioningParameters
+            Task.Factory.StartNew(() =>
                 {
-                    LastPositionedShipCoordinate = position,
-                    LastShipDirection = directionOfPositioning
-                };
-            _shipPositioningParametersPerShipLevel.Add(shipsPositionedSoFar, currentlyPositionedShipPositioningParameters);
-        }
+                    var allPossiblePositions = _shipConfiguration.GetListOfPossibleCombinationsOfShipPositions();
 
-        private BoardCoordinate FindNextFreeSpace(BoardCoordinate cellToStartSearch, ShipDirection direction, int shipLength)
-        {
-            // the free space must be a cluster of cells with 'Free' status, such that
-            // they can be contiguous and none of the cells of the new ship lands on 
-            // a 'not available for placement' or 'ship part' field. 
-
-            // TODO - overflow to start search from 0 when cannot find place in the last column
-
-            for (var row = cellToStartSearch.Row; row < 10; row++)
-            {
-                for (var column = cellToStartSearch.Column; column < 10; column++)
-                {
-                    if (_workingSet[row, column] == CellStatus.Free)
+                    foreach (var list in allPossiblePositions)
                     {
-                        if (direction == ShipDirection.Horizontal)
-                        {
-                            // first - check if there is enough room to place the ship in the current row/column
-                            if (column + shipLength > 9)
-                                continue;
 
-                            // next, check if the entire span of the next few cells is available
-                            var spanAvailable = true;
-                            for (var c = column; c < column + shipLength; c++)
-                            {
-                                if (_workingSet[row, c] != CellStatus.Free)
-                                {
-                                    spanAvailable = false;
-                                    break;
-                                }
-                            }
-                            if (!spanAvailable)
-                                continue;
-                        }
-                        else
-                        {
-                            if (row + shipLength > 9)
-                                continue;
+                        // if the list has duplicates, skip it
+                        if(list.Count() != list.Distinct().Count())
+                            continue;
 
-                            var spanAvailable = true;
-                            for (var r = row; r < row + shipLength; r++)
-                            {
-                                if (_workingSet[r, column] != CellStatus.Free)
-                                {
-                                    spanAvailable = false;
-                                    break;
-                                }
-                            }
-                            if (!spanAvailable)
-                                continue;
-                        }
+                        _mainQueue.Enqueue(list);
 
-                        return new BoardCoordinate(row, column);
+                        if (_mainQueue.Count > 1000)
+                            Thread.Sleep(5000);
                     }
-                }
-            }
-
-            throw new Exception("Could not find a free field in the entire table!");
-        }
-
-        private Board ConvertWorkingSetIntoBoard()
-        {
-            var generated = new Board(_shipConfiguration);
-
-            _workingSet.Foreach((row, column) =>
-                {
-                    if (_workingSet[row, column] == CellStatus.ShipPart)
-                        generated.BoardRepresentation.Add(new BoardCoordinate(row, column));
                 });
-
-            if (!generated.IsValid)
-            {
-                throw new Exception("Generated board is invalid!");
-            }
-
-            return generated;
         }
 
-        private void ReInitializeWorkingSet()
+        public void GenerateBoards()
         {
-            _workingSet.Foreach((row, c) => _workingSet[row, c] = CellStatus.Free);
+            Action produceBoards = () =>
+                {
+                    var exceptionCount = 0;
+
+                    while (exceptionCount < 5)
+                    {
+                        try
+                        {
+                            if (_mainQueue.Count == 0)
+                                Thread.Sleep(5000);
+
+                            var config = _mainQueue.Dequeue().ToArray();
+                            var board = new SingleBoardGenerator(_shipConfiguration).GenerateBoard(config);
+                            _boardQueue.Enqueue(board);
+                        }
+                        catch (Exception e)
+                        {
+
+                        }
+                    }
+                };
+
+            Action writeToFile = () =>
+                {
+                    while (true)
+                    {
+                        try
+                        {
+                            if (_boardQueue.Count < 1000)
+                            {
+                                Thread.Sleep(5000);
+                                continue;
+                            }
+
+                            var toWriteToFile = new List<Board>(1000);
+                            for (int i = 0; i < 1000; i++)
+                                toWriteToFile.Add(_boardQueue.Dequeue());
+
+                            using (var file = new System.IO.StreamWriter(@"Boards.txt"))
+                            {
+                                foreach (var board in toWriteToFile)
+                                {
+                                    file.WriteLine(board);
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            break;
+                        }
+                    }
+                };
+
+            PopulateProcessingQueue();
+            Task.Factory.StartNew(produceBoards);
+            //Task.Factory.StartNew(produceBoards);
+            //Task.Factory.StartNew(produceBoards);
+            Task.Factory.StartNew(writeToFile);
         }
     }
 
-    internal class ShipPositioningParameters
-    {
-        public BoardCoordinate LastPositionedShipCoordinate { get; set; }
-        public ShipDirection LastShipDirection { get; set; }
-    }
 
-    internal enum ShipDirection
-    {
-        Horizontal,
-        Vertical
-    }
 
     internal enum CellStatus
     {
+        Free,
         ShipPart,
-        NotAvailableForPlacement,
-        Free
+        NotAvailableForPlacement
     }
 }

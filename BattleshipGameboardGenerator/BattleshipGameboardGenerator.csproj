@@ -45,10 +45,10 @@
     <Compile Include="BoardCoordinate.cs" />
     <Compile Include="BoardPresenter.cs" />
     <Compile Include="BruteForceBoardGenerationStrategy.cs" />
-    <Compile Include="IBoardGenerationStrategy.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ShipConfiguration.cs" />
+    <Compile Include="SingleBoardGenerator.cs" />
     <Compile Include="Util.cs" />
   </ItemGroup>
   <ItemGroup>
