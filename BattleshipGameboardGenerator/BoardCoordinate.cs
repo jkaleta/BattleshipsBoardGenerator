@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace BattleshipGameboardGenerator
@@ -27,5 +28,10 @@ namespace BattleshipGameboardGenerator
         }
 
         public static BoardCoordinate Default = new BoardCoordinate(0, 0);
+
+        public static BoardCoordinate GetRandomCoordinateInFirstQuadrant()
+        {
+            return new BoardCoordinate(new Random(DateTime.Now.Millisecond).Next() % 4, new Random(DateTime.Now.Millisecond).Next() % 4);
+        }
     }
 }

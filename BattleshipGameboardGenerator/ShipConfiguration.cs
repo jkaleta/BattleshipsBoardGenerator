@@ -1,46 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace BattleshipGameboardGenerator
+﻿namespace BattleshipGameboardGenerator
 {
-    public class ShipConfiguration
+    public class GameConfiguration
     {
-        public ShipConfiguration(int[] shipLengths)
+        public GameConfiguration(string friendlyName, int[] shipLengths, int boardSize)
         {
+            FriendlyName = friendlyName;
             ShipLengths = shipLengths;
+            ShipCount = ShipLengths.Length;
+            BoardSize = boardSize;
         }
 
+        public string FriendlyName { get; set; }
         public int[] ShipLengths { get; private set; }
+        public int ShipCount { get; private set; }
+        public int BoardSize { get; private set; }
 
-        public IEnumerable<IEnumerable<ShipPositioningParameters>> GetListOfPossibleCombinationsOfShipPositions()
-        {
-            var possiblePositionsOnBoard = BoardCoordinate.GetAllPossibleCoordinates(10, 10).ToArray();
-            var allHorizontalPositions =
-                (from position in possiblePositionsOnBoard.Where(p => p.Row != 5 && p.Column != 2 && p.Row % 2 == 1 && p.Column % 2 == 0)
-                 select new ShipPositioningParameters
-                     {
-                         ShipCoordinate = position,
-                         ShipDirection = ShipDirection.Horizontal
-                     }).ToArray();
-            var allVerticalPositions =
-                 (from position in possiblePositionsOnBoard.Where(p => p.Row != 8 && p.Column != 4 && p.Row % 2 == 0 && p.Column % 2 == 1)
-                  select new ShipPositioningParameters
-                  {
-                      ShipCoordinate = position,
-                      ShipDirection = ShipDirection.Vertical
-                  }).ToArray();
-
-            var allPossiblePositioningParametersForShip = allHorizontalPositions.Union(allVerticalPositions).ToArray();
-
-            var rng = new Random();
-
-            var lists = ShipLengths.Select(t => t > 1 ?
-                allPossiblePositioningParametersForShip.Shuffle(new Random(rng.Next())) :
-                allHorizontalPositions.Shuffle(new Random(rng.Next()))).ToList();
-
-            return lists.CartesianProduct();
-        }
+        public static GameConfiguration RussianConfiguration = new GameConfiguration("Russian Configuration", new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }, 10);
+        public static GameConfiguration MiltonBradleyConfiguration = new GameConfiguration("Milton Bradley Configuration", new[] { 5, 4, 3, 3, 2}, 10);
     }
 
     public class ShipPositioningParameters

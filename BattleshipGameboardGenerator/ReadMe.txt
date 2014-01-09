@@ -1,8 +1,4 @@
-﻿The mathematics behind Battleship are pretty simple. 
-
-In this implementation I am assuming the most popular variant of a 10x10 grid with the following ships placed in the board: 
-
-Type of ship 				Size
+﻿Type of ship 				Size
 aircraft carrier 			5
 battleship 					4
 submarine 					3

@@ -1,26 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace BattleshipGameboardGenerator
 {
     class SingleBoardGenerator
     {
-        private readonly ShipConfiguration _shipConfiguration;
+        private readonly GameConfiguration _gameConfiguration;
         private readonly IDictionary<int, ShipPositioningParameters> _shipPositioningParametersPerShipLevel;
 
-        public SingleBoardGenerator(ShipConfiguration shipConfiguration)
+        public SingleBoardGenerator(GameConfiguration gameConfiguration)
         {
-            _shipConfiguration = shipConfiguration;
-            _shipPositioningParametersPerShipLevel = new Dictionary<int, ShipPositioningParameters>(shipConfiguration.ShipLengths.Length);
+            _gameConfiguration = gameConfiguration;
+            _shipPositioningParametersPerShipLevel = new Dictionary<int, ShipPositioningParameters>(gameConfiguration.ShipCount);
         }
 
         public Board GenerateBoard(ShipPositioningParameters[] shipPositioningParameters)
         {
-            var workingSet = new CellStatus[10, 10];
+            var workingSet = new CellStatus[_gameConfiguration.BoardSize, _gameConfiguration.BoardSize];
             PlaceShips(workingSet, shipPositioningParameters);
             return ConvertWorkingSetIntoBoard(workingSet);
         }
@@ -29,31 +27,29 @@ namespace BattleshipGameboardGenerator
         {
             var shipsPositionedSoFar = _shipPositioningParametersPerShipLevel.Count;
 
-            if (shipsPositionedSoFar == _shipConfiguration.ShipLengths.Length)
+            Logger.Log("PlaceShips called with {0} ships positioned so far. (Thread {1})", shipsPositionedSoFar, Thread.CurrentThread.ManagedThreadId);
+
+            if (shipsPositionedSoFar == _gameConfiguration.ShipCount)
             {
                 return;
             }
 
-            var lengthOfNextShipToPosition = _shipConfiguration.ShipLengths[shipsPositionedSoFar];
+            var lengthOfNextShipToPosition = _gameConfiguration.ShipLengths[shipsPositionedSoFar];
             var directionOfPositioning = shipPositioningParameters[shipsPositionedSoFar].ShipDirection;
             var startingCoordinate = shipPositioningParameters[shipsPositionedSoFar].ShipCoordinate;
 
-            try
-            {
-                var position = FindNextFreeSpace(workingSet, startingCoordinate, directionOfPositioning,
+            var position = FindNextFreeSpace(workingSet, startingCoordinate, directionOfPositioning,
                                                  lengthOfNextShipToPosition);
-                // actual positioning of the ship
-                PlaceShipOnMap(workingSet, lengthOfNextShipToPosition, directionOfPositioning, position);
-                PlaceShips(workingSet, shipPositioningParameters);
-            }
-            catch
+
+            while (!position.HasValue)
             {
-                var position = FindNextFreeSpace(workingSet, BoardCoordinate.Default, directionOfPositioning,
-                                                 lengthOfNextShipToPosition);
-                // actual positioning of the ship
-                PlaceShipOnMap(workingSet, lengthOfNextShipToPosition, directionOfPositioning, position);
-                PlaceShips(workingSet, shipPositioningParameters);
+                position = FindNextFreeSpace(workingSet, BoardCoordinate.GetRandomCoordinateInFirstQuadrant(), directionOfPositioning,
+                                             lengthOfNextShipToPosition);
             }
+
+            // actual positioning of the ship
+            PlaceShipOnMap(workingSet, lengthOfNextShipToPosition, directionOfPositioning, position.Value);
+            PlaceShips(workingSet, shipPositioningParameters);
         }
 
         private void PlaceShipOnMap(CellStatus[,] workingSet, int lengthOfNextShipToPosition, ShipDirection directionOfPositioning, BoardCoordinate position)
@@ -62,23 +58,23 @@ namespace BattleshipGameboardGenerator
             var startingCoordinateX = Math.Max(position.Column - 1, 0);
             var startingCoordinateY = Math.Max(position.Row - 1, 0);
             var endCoordinateX = directionOfPositioning == ShipDirection.Horizontal ?
-                Math.Min(position.Column + lengthOfNextShipToPosition, 9) :
-                Math.Min(position.Column + 1, 9);
+                Math.Min(position.Column + lengthOfNextShipToPosition, _gameConfiguration.BoardSize - 1) :
+                Math.Min(position.Column + 1, _gameConfiguration.BoardSize - 1);
             var endCoordinateY = directionOfPositioning == ShipDirection.Vertical ?
-                Math.Min(position.Row + lengthOfNextShipToPosition, 9) :
-                Math.Min(position.Row + 1, 9);
+                Math.Min(position.Row + lengthOfNextShipToPosition, _gameConfiguration.BoardSize - 1) :
+                Math.Min(position.Row + 1, _gameConfiguration.BoardSize - 1);
 
             for (var row = startingCoordinateY; row <= endCoordinateY; row++)
                 for (var column = startingCoordinateX; column <= endCoordinateX; column++)
                     workingSet[row, column] = CellStatus.NotAvailableForPlacement;
 
-            Debug.WriteLine(RepresentWorkingSet(workingSet));
+            //Debug.WriteLine(RepresentWorkingSet(workingSet));
 
             // next mark where the ship actually is
             for (int i = 0; i < lengthOfNextShipToPosition; i++)
             {
-                var row = directionOfPositioning == ShipDirection.Horizontal ? position.Row : Math.Min(position.Row + i, 9);
-                var column = directionOfPositioning == ShipDirection.Vertical ? position.Column : Math.Min(position.Column + i, 9);
+                var row = directionOfPositioning == ShipDirection.Horizontal ? position.Row : Math.Min(position.Row + i, _gameConfiguration.BoardSize - 1);
+                var column = directionOfPositioning == ShipDirection.Vertical ? position.Column : Math.Min(position.Column + i, _gameConfiguration.BoardSize - 1);
 
                 workingSet[row, column] = CellStatus.ShipPart;
             }
@@ -92,24 +88,24 @@ namespace BattleshipGameboardGenerator
             };
             _shipPositioningParametersPerShipLevel.Add(shipsPositionedSoFar, currentlyPositionedShipPositioningParameters);
 
-            Debug.WriteLine(RepresentWorkingSet(workingSet));
+            //Debug.WriteLine(RepresentWorkingSet(workingSet));
         }
 
-        private BoardCoordinate FindNextFreeSpace(CellStatus[,] workingSet, BoardCoordinate cellToStartSearch, ShipDirection direction, int shipLength)
+        private BoardCoordinate? FindNextFreeSpace(CellStatus[,] workingSet, BoardCoordinate cellToStartSearch, ShipDirection direction, int shipLength)
         {
             // the free space must be a cluster of cells with 'Free' status, such that
             // they can be contiguous and none of the cells of the new ship lands on 
             // a 'not available for placement' or 'ship part' field.
-            for (var row = cellToStartSearch.Row; row < 10; row++)
+            for (var row = cellToStartSearch.Row; row < _gameConfiguration.BoardSize; row++)
             {
-                for (var column = cellToStartSearch.Column; column < 10; column++)
+                for (var column = cellToStartSearch.Column; column < _gameConfiguration.BoardSize; column++)
                 {
                     if (workingSet[row, column] == CellStatus.Free)
                     {
                         if (direction == ShipDirection.Horizontal)
                         {
                             // first - check if there is enough room to place the ship in the current row/column
-                            if (column + shipLength > 9)
+                            if (column + shipLength > _gameConfiguration.BoardSize - 1)
                                 continue;
 
                             // next, check if the entire span of the next few cells is available
@@ -127,7 +123,7 @@ namespace BattleshipGameboardGenerator
                         }
                         else
                         {
-                            if (row + shipLength > 9)
+                            if (row + shipLength > _gameConfiguration.BoardSize - 1)
                                 continue;
 
                             var spanAvailable = true;
@@ -148,12 +144,12 @@ namespace BattleshipGameboardGenerator
                 }
             }
 
-            throw new Exception("Could not find a free field in the entire table!");
+            return null;
         }
 
         private Board ConvertWorkingSetIntoBoard(CellStatus[,] workingSet)
         {
-            var generated = new Board(_shipConfiguration);
+            var generated = new Board(_gameConfiguration);
 
             workingSet.Foreach((row, column) =>
             {

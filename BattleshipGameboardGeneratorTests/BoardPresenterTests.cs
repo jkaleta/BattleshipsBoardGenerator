@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using BattleshipGameboardGenerator;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -12,7 +11,7 @@ namespace BattleshipGameboardGeneratorTests
         public void PresentBoardAsString()
         {
             // Arrange
-            var board = new Board(new ShipConfiguration(new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }));
+            var board = new Board(new GameConfiguration("", new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 }, 10));
             board.BoardRepresentation.Add(new BoardCoordinate(1, 0));
             board.BoardRepresentation.Add(new BoardCoordinate(2, 0));
             board.BoardRepresentation.Add(new BoardCoordinate(3, 0));
@@ -50,7 +49,7 @@ namespace BattleshipGameboardGeneratorTests
                 "1100000101" + Environment.NewLine;
 
             // Act
-            var representation = new BoardPresenter().PresentBoardGraphically(board, '0', '1');
+            var representation = board.PresentBoardGraphically('0', '1');
 
             // Assert
             Assert.AreEqual(expected, representation);
