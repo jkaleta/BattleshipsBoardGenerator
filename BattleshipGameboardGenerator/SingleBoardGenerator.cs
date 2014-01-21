@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 
@@ -157,8 +158,11 @@ namespace BattleshipGameboardGenerator
                     generated.BoardRepresentation.Add(new BoardCoordinate(row, column));
             });
 
-            if (!generated.IsValid)
+            string validationError = generated.Validate(); 
+            if (validationError != null)
             {
+                Debug.Print(validationError);
+                Debug.Print(generated.PresentBoardGraphically());
                 throw new Exception("Generated board is invalid!");
             }
 
