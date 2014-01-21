@@ -33,5 +33,25 @@ namespace BattleshipGameboardGenerator
         {
             return new BoardCoordinate(new Random(DateTime.Now.Millisecond).Next() % 4, new Random(DateTime.Now.Millisecond).Next() % 4);
         }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is BoardCoordinate))
+                return false;
+
+            BoardCoordinate other = (BoardCoordinate)obj;
+            return Row == other.Row && Column == other.Column;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + Row;
+                hash = hash * 23 + Column;
+                return hash;
+            }
+        }
     }
 }
